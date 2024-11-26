@@ -1,6 +1,20 @@
 import pandas as pd
 import numpy as np
 import re
+import matchmaking
+from matchmaking import Player
+from matchmaking import calculate_kda
+from matchmaking import calculate_mmr
+
+# MMR_SCALE = 3000.0
+# GAMES_SCALE = 1000.0
+# WINRATE_SCALE = 100.0
+# KILLS_SCALE = 100.0
+# DEATHS_SCALE = 100.0
+# ASSISTS_SCALE = 100.0
+# CREEPS_SCALE = 10.0
+# GOLD_SCALE = 1000.0
+# KDA_SCALE = 10.0
 
 # Blue odd, Red even
 BLUE_TEAM_SUFFIXES = ['', ' 3', ' 5', ' 7', ' 9']
@@ -144,12 +158,65 @@ def calculate_matchmaking_score(df):
 
     return scored_df
 
+
+def calculate_lineup_score(games, games_players, scored_df):
+    scored_df['lineup_score'] = None
+    for i in range(len(games)):
+        players = [games.iloc[i]['name'], games.iloc[i]['name 2'], games.iloc[i]['name 3'], games.iloc[i]['name 4'],
+                   games.iloc[i]['name 5'], games.iloc[i]['name 6'], games.iloc[i]['name 7'], games.iloc[i]['name 8'],
+                   games.iloc[i]['name 9'], games.iloc[i]['name 10']]
+        game_matrix = []
+        for player in players:
+            for j in range(len(games_players)):
+                if player == games_players.iloc[j]['username']:
+                    player = games_players.iloc[j]
+                    player = Player(
+                        id=player.username,
+                        mmr=None,
+                        win_rate=player.winrate,
+                        games_played=player.games_won,  # NOT PLAYED
+                        role=player.most_played_role,
+                        rank=player.rank,
+                        division=player.division,
+                        lp=player.lp,
+                        kills=player.kills,
+                        death=player.death,
+                        assists=player.assists,
+                        avg_creeps_per_min=player.avg_creeps_per_min,
+                        avg_gold_per_min=player.avg_gold_per_min,
+                        calculated_kda=None
+                    )
+                    player.mmr = calculate_mmr(player.__dict__)
+                    player.calculated_kda = calculate_kda(player.__dict__)
+                    game_matrix.append(
+                        [player.mmr / matchmaking.MMR_SCALE, player.win_rate / matchmaking.WINRATE_SCALE, player.games_played / matchmaking.GAMES_SCALE,
+                         player.calculated_kda / matchmaking.KDA_SCALE, player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
+                         player.avg_gold_per_min / matchmaking.GOLD_SCALE])
+        game_matrix = np.array(game_matrix)
+        # calculate variance between the different players stats
+        variance = np.var(game_matrix, axis=0)
+        # calculate the norm of the variance
+        norm = np.linalg.norm(variance)
+        print(norm)
+        print(game_matrix)
+        print(games.iloc[i]['name 10'])
+        for k in range(len(games_players)):
+            if games_players.iloc[k]['username'] == 'sparck#gado':
+                print(games_players.iloc[k])
+        scored_df.loc[i, 'lineup_score'] = norm
+    return scored_df
+
+
 def main():
     games_data = pd.read_csv('Games_data_raw.csv')
     games_data = process_games_data(games_data)
     scored_df = calculate_matchmaking_score(games_data)
     # scored_df.to_csv('output_with_matchmaking_score.csv', index=False)
-    print(scored_df[['kill_diff','gold_diff', 'gameDuration','matchmaking_score']].head())
+
+    games_players = pd.read_csv("games_players_data_filtered.csv")
+    scored_df = calculate_lineup_score(games_data, games_players, scored_df)
+
+    print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'matchmaking_score', 'lineup_score']].head())
 
 
 if __name__ == '__main__':
