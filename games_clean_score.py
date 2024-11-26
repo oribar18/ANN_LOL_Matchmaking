@@ -148,9 +148,8 @@ def main():
     games_data = pd.read_csv('Games_data_raw.csv')
     games_data = process_games_data(games_data)
     scored_df = calculate_matchmaking_score(games_data)
-    scored_df.to_csv('output_with_matchmaking_score.csv', index=False)
+    # scored_df.to_csv('output_with_matchmaking_score.csv', index=False)
     print(scored_df[['kill_diff','gold_diff', 'gameDuration','matchmaking_score']].head())
-    # games_data.head(10).to_csv('games_data_processed.csv', index=False)
 
 
 if __name__ == '__main__':
