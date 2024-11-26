@@ -28,6 +28,8 @@ def process_games_data(df):
 
     try:
         df['game_duration_mins'] = df['gameDuration'].apply(parse_game_duration)
+        # Filter out games with less than 15 minutes
+        df = df[df['game_duration_mins'] >= 15].copy()
         df = process_cs_gold_columns(df)
         df = calculate_team_stats(df)
         return df
@@ -130,29 +132,48 @@ def calculate_matchmaking_score(df):
     scored_df['assists_diff'] = abs(scored_df['blue_assists'] - scored_df['red_assists'])
     scored_df['creeps_diff'] = abs(scored_df['blue_creeps'] - scored_df['red_creeps'])
 
+    scored_df['kill_diff_norm'] = scored_df['kill_diff'] / scored_df['game_duration_mins']
+    scored_df['gold_diff_norm'] = scored_df['gold_diff'] / scored_df['game_duration_mins']
+    scored_df['assists_diff_norm'] = scored_df['assists_diff'] / scored_df['game_duration_mins']
+    scored_df['creeps_diff_norm'] = scored_df['creeps_diff'] / scored_df['game_duration_mins']
+
     # Normalize metrics (lower is better)
-    max_kill_diff = scored_df['kill_diff'].max()
-    max_gold_diff = scored_df['gold_diff'].max()
-    max_assists_diff = scored_df['assists_diff'].max()
-    max_creeps_diff = scored_df['creeps_diff'].max()
+    max_kill_diff = scored_df['kill_diff_norm'].max()
+    max_gold_diff = scored_df['gold_diff_norm'].max()
+    max_assists_diff = scored_df['assists_diff_norm'].max()
+    max_creeps_diff = scored_df['creeps_diff_norm'].max()
 
     # Calculate normalized scores (0-1 range, where 1 is best)
-    scored_df['kill_diff_score'] = 1 - (scored_df['kill_diff'] / max_kill_diff)
-    scored_df['gold_diff_score'] = 1 - (scored_df['gold_diff'] / max_gold_diff)
-    scored_df['assists_diff_score'] = 1 - (scored_df['assists_diff'] / max_assists_diff)
-    scored_df['creeps_diff_score'] = 1 - (scored_df['creeps_diff'] / max_creeps_diff)
+    scored_df['kill_diff_score'] = 1 - (scored_df['kill_diff_norm'] / max_kill_diff)
+    scored_df['gold_diff_score'] = 1 - (scored_df['gold_diff_norm'] / max_gold_diff)
+    scored_df['assists_diff_score'] = 1 - (scored_df['assists_diff_norm'] / max_assists_diff)
+    scored_df['creeps_diff_score'] = 1 - (scored_df['creeps_diff_norm'] / max_creeps_diff)
 
     # Ideal game duration around 30 minutes, with max score at 30 and decreasing as you move away
-    scored_df['duration_score'] = 1 - abs(scored_df['game_duration_mins'] - 30) / 30
+    scored_df['duration_score'] = np.exp(-((scored_df['game_duration_mins'] - 30) ** 2) / 200)
 
-    # Combine scores with weighted average
-    scored_df['matchmaking_score'] = (
-                                             0.3 * scored_df['kill_diff_score'] +
-                                             0.3 * scored_df['gold_diff_score'] +
-                                             0.1 * scored_df['assists_diff_score'] +
-                                             0.1 * scored_df['creeps_diff_score'] +
-                                             0.2 * scored_df['duration_score']
-                                     ) * 100  # Scale to 0-100
+    # Adjust weights dynamically based on duration_score
+    def dynamic_weights(duration_score):
+        if duration_score < 0.65:  # If the duration score is low
+            return [0.15, 0.15, 0.1, 0.1, 0.5]  # Higher weight for duration score
+        else:  # If the duration score is high
+            return [0.375, 0.375, 0.1, 0.1, 0.05]  # Reduced weight for duration score
+
+    # Apply dynamic weights to calculate matchmaking score
+    def calculate_matchmaking_score_with_dynamic_weights(row):
+        weights = dynamic_weights(row['duration_score'])
+        kill_weight, gold_weight, assists_weight, creeps_weight, duration_weight = weights
+
+        return (
+                       kill_weight * row['kill_diff_score'] +
+                       gold_weight * row['gold_diff_score'] +
+                       assists_weight * row['assists_diff_score'] +
+                       creeps_weight * row['creeps_diff_score'] +
+                       duration_weight * row['duration_score']
+               ) * 100  # Scale to 0-100
+
+    # Calculate the matchmaking score dynamically for each row
+    scored_df['matchmaking_score'] = scored_df.apply(calculate_matchmaking_score_with_dynamic_weights, axis=1)
 
     scored_df['matchmaking_score'] = scored_df['matchmaking_score'].round(2)
 
@@ -213,10 +234,11 @@ def main():
     scored_df = calculate_matchmaking_score(games_data)
     # scored_df.to_csv('output_with_matchmaking_score.csv', index=False)
 
-    games_players = pd.read_csv("games_players_data_filtered.csv")
-    scored_df = calculate_lineup_score(games_data, games_players, scored_df)
+    # games_players = pd.read_csv("games_players_data_filtered.csv")
+    # scored_df = calculate_lineup_score(games_data, games_players, scored_df)
 
-    print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'matchmaking_score', 'lineup_score']].head())
+    print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'matchmaking_score']].head())
+    scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'matchmaking_score']].to_csv('scored_df.csv')
 
 
 if __name__ == '__main__':
