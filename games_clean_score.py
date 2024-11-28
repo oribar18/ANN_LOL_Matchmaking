@@ -211,19 +211,22 @@ def calculate_lineup_score(scored_df, games_players):
                     player.mmr = calculate_mmr(player.__dict__)
                     player.calculated_kda = calculate_kda(player.__dict__)
                     game_matrix.append(
-                        [player.mmr / matchmaking.MMR_SCALE, player.win_rate / matchmaking.WINRATE_SCALE, player.games_played / matchmaking.GAMES_SCALE,
+                        [max(player.mmr / matchmaking.MMR_SCALE - 0.8, 0.0) * 5.0, min(max(player.win_rate / matchmaking.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0), player.games_played / matchmaking.GAMES_SCALE,
                          player.calculated_kda / matchmaking.KDA_SCALE, player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
                          player.avg_gold_per_min / matchmaking.GOLD_SCALE])
         game_matrix = np.array(game_matrix)
-        print(game_matrix)
+        # print(game_matrix)
         # calculate variance between the different players stats
         variance = np.var(game_matrix, axis=0)
-        print(variance)
+        # print(variance)
         # calculate the norm of the variance
         norm = np.linalg.norm(variance)
         scored_df.loc[i, 'lineup_score'] = 1 / norm
 
-    return scored_df
+    filtered_scored_df = scored_df[scored_df['lineup_score'] <= 32]
+    filtered_scored_df['lineup_score'] = filtered_scored_df['lineup_score'] * 3.0
+
+    return filtered_scored_df
 
 
 def main():
@@ -243,33 +246,6 @@ def main():
 
     plt.scatter(scored_df['matchmaking_score'], scored_df['lineup_score'])
     plt.title('Relationship between matchmaking_score and lineup_score')
-    plt.xlabel('matchmaking_score')
-    plt.ylabel('lineup_score')
-    plt.grid(True)
-    plt.show()
-
-    scored_l_35 = scored_df[scored_df['lineup_score'] < 35.0]
-    scored_ge_35 = scored_df[scored_df['lineup_score'] >= 35.0]
-
-
-    correlation = scored_l_35['matchmaking_score'].corr(scored_l_35['lineup_score'])
-    print(f"correlation l_35: {correlation}")
-    print(f"mean l_35: {scored_l_35['matchmaking_score'].mean()}")
-
-    plt.scatter(scored_l_35['matchmaking_score'], scored_l_35['lineup_score'])
-    plt.title('when lineup_score < 35')
-    plt.xlabel('matchmaking_score')
-    plt.ylabel('lineup_score')
-    plt.grid(True)
-    plt.show()
-
-
-    correlation = scored_ge_35['matchmaking_score'].corr(scored_ge_35['lineup_score'])
-    print(f"correlation ge_35: {correlation}")
-    print(f"mean ge_35: {scored_ge_35['matchmaking_score'].mean()}")
-
-    plt.scatter(scored_ge_35['matchmaking_score'], scored_ge_35['lineup_score'])
-    plt.title('when lineup_score >= 35')
     plt.xlabel('matchmaking_score')
     plt.ylabel('lineup_score')
     plt.grid(True)
