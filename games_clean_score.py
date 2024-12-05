@@ -6,7 +6,8 @@ from matchmaking import Player
 from matchmaking import calculate_kda
 from matchmaking import calculate_mmr
 import matplotlib.pyplot as plt
-
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 # MMR_SCALE = 3000.0
 # GAMES_SCALE = 1000.0
 # WINRATE_SCALE = 100.0
@@ -107,7 +108,7 @@ def calculate_team_stats(df):
     return df
 
 
-def calculate_matchmaking_score(df):
+def calculate_game_score(df):
     """
     Calculate a matchmaking quality score based on game balance metrics.
 
@@ -122,7 +123,7 @@ def calculate_matchmaking_score(df):
         df (pd.DataFrame): DataFrame containing match data
 
     Returns:
-        pd.DataFrame: Original DataFrame with added 'matchmaking_score' column
+        pd.DataFrame: Original DataFrame with added 'game_score' column
     """
     # Create a copy to avoid modifying original DataFrame
     scored_df = df.copy()
@@ -161,7 +162,7 @@ def calculate_matchmaking_score(df):
             return [0.375, 0.375, 0.1, 0.1, 0.05]  # Reduced weight for duration score
 
     # Apply dynamic weights to calculate matchmaking score
-    def calculate_matchmaking_score_with_dynamic_weights(row):
+    def calculate_game_score_with_dynamic_weights(row):
         weights = dynamic_weights(row['duration_score'])
         kill_weight, gold_weight, assists_weight, creeps_weight, duration_weight = weights
 
@@ -174,82 +175,336 @@ def calculate_matchmaking_score(df):
                ) * 100  # Scale to 0-100
 
     # Calculate the matchmaking score dynamically for each row
-    scored_df['matchmaking_score'] = scored_df.apply(calculate_matchmaking_score_with_dynamic_weights, axis=1)
+    scored_df['game_score'] = scored_df.apply(calculate_game_score_with_dynamic_weights, axis=1)
 
-    scored_df['matchmaking_score'] = scored_df['matchmaking_score'].round(2)
+    scored_df['game_score'] = scored_df['game_score'].round(2)
 
     return scored_df
 
 
-def calculate_lineup_score(scored_df, games_players):
-    scored_df['lineup_score'] = None
+def create_matrix_for_game(game_row, games_players):
+    team_1_players = ['name', 'name 3', 'name 5', 'name 7', 'name 9']
+    team_2_players = ['name 2', 'name 4', 'name 6', 'name 8', 'name 10']
+    all_players = team_1_players + team_2_players
+    players = [game_row[player] for player in all_players]
+    game_matrix = []
+    game_matrix_dicts = []
+    for player in players:
+        for j in range(len(games_players)):
+            if player == games_players.iloc[j]['username']:
+                player = games_players.iloc[j]
+                player = Player(
+                    id=player.username,
+                    mmr=None,
+                    win_rate=player.winrate,
+                    games_played=player.games_won,  # NOT PLAYED
+                    role=player.most_played_role,
+                    rank=player.rank,
+                    division=player.division,
+                    lp=player.lp,
+                    kills=player.kills,
+                    death=player.death,
+                    assists=player.assists,
+                    avg_creeps_per_min=player.avg_creeps_per_min,
+                    avg_gold_per_min=player.avg_gold_per_min,
+                    calculated_kda=None
+                )
+                player.mmr = calculate_mmr(player.__dict__)
+                player.calculated_kda = calculate_kda(player.__dict__)
+                game_matrix.append(
+                    [max(player.mmr / matchmaking.MMR_SCALE - 0.8, 0.0) * 5.0,
+                     min(max(player.win_rate / matchmaking.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0),
+                     player.games_played / matchmaking.GAMES_SCALE,
+                     player.calculated_kda / matchmaking.KDA_SCALE,
+                     player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
+                     player.avg_gold_per_min / matchmaking.GOLD_SCALE])
+                # game_matrix.append(
+                #     [player.mmr / matchmaking.MMR_SCALE,
+                #      player.win_rate / matchmaking.WINRATE_SCALE,
+                #      player.games_played / matchmaking.GAMES_SCALE,
+                #      player.calculated_kda / matchmaking.KDA_SCALE,
+                #      player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
+                #      player.avg_gold_per_min / matchmaking.GOLD_SCALE])
+                player_dict_filtered = {'mmr': player.mmr / matchmaking.MMR_SCALE,
+                                        'win_rate': player.win_rate / matchmaking.WINRATE_SCALE,
+                                        'games_played': player.games_played / matchmaking.GAMES_SCALE,
+                                        'role': player.role,
+                                        'calculated_kda': player.calculated_kda / matchmaking.KDA_SCALE,
+                                        'avg_creeps_per_min': player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
+                                        'avg_gold_per_min': player.avg_gold_per_min / matchmaking.GOLD_SCALE}
+                game_matrix_dicts.append(player_dict_filtered)
+    game_matrix = np.array(game_matrix)
+    return game_matrix, game_matrix_dicts
+
+def calculate_lineup_variance(game_matrix):
+    variance_vec = np.var(game_matrix, axis=0)
+    variance_norm = np.linalg.norm(variance_vec)
+    return tuple(variance_vec), variance_norm
+
+
+def calculate_maximal_diff(game_dicts, feature, role_equal):
+    team_1_locs = range(5)
+    team_2_locs = range(5, 10)
+    max_diff = 0
+    for j in team_1_locs:
+        for k in team_2_locs:
+            if (not role_equal) or game_dicts[j]['role'] == game_dicts[k]['role']:
+                diff = abs(game_dicts[j][feature] - game_dicts[k][feature])
+                if diff > max_diff:
+                    max_diff = diff
+    return max_diff
+
+
+def calculate_max_diff(game_dicts, feature):
+    team_1_locs = range(5)
+    team_2_locs = range(5, 10)
+    max_team_1 = max([game_dicts[j][feature] for j in team_1_locs])
+    max_team_2 = max([game_dicts[j][feature] for j in team_2_locs])
+    return abs(max_team_1 - max_team_2)
+
+
+def calculate_mean_diff(game_dicts, feature):
+    team_1_locs = range(5)
+    team_2_locs = range(5, 10)
+    mean_team_1 = sum([game_dicts[j][feature] for j in team_1_locs]) / len(team_1_locs)
+    mean_team_2 = sum([game_dicts[j][feature] for j in team_2_locs]) / len(team_2_locs)
+    return abs(mean_team_1 - mean_team_2)
+
+
+# game_matrix.append(
+#     [max(player.mmr / matchmaking.MMR_SCALE - 0.8, 0.0) * 5.0,
+#      min(max(player.win_rate / matchmaking.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0),
+#      player.games_played / matchmaking.GAMES_SCALE,
+#      player.calculated_kda / matchmaking.KDA_SCALE,
+#      player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
+#      player.avg_gold_per_min / matchmaking.GOLD_SCALE])
+
+def calculate_lineup_features(scored_df, games_players):
+    team_1_locs = range(5)
+    team_2_locs = range(5, 10)
+    # columns = ['var_mmr', 'var_win_rate', 'var_games_played', 'var_kda', 'var_creeps', 'var_gold', 'normed_var',
+    #            'maximal_mmr_diff', 'maximal_kda_diff', 'maximal_win_rate_diff', 'maximal_games_played_diff',
+    #            'maximal_creeps_diff', 'maximal_gold_diff', 'max_mmr_diff', 'max_kda_diff', 'max_win_rate_diff',
+    #            'max_games_played_diff', 'max_creeps_diff', 'max_gold_diff', 'mean_mmr_diff', 'mean_kda_diff',
+    #            'mean_win_rate_diff', 'mean_games_played_diff', 'mean_creeps_diff', 'mean_gold_diff']
+
+    columns = ['var_mmr', 'var_win_rate', 'var_kda', 'var_creeps', 'normed_var', 'maximal_mmr_diff', 'maximal_kda_diff',
+               'maximal_win_rate_diff','maximal_creeps_diff',
+               'maximal_gold_diff', 'max_mmr_diff', 'max_kda_diff', 'max_win_rate_diff',
+               'max_creeps_diff', 'max_gold_diff', 'mean_mmr_diff', 'mean_kda_diff',
+               'mean_win_rate_diff', 'mean_creeps_diff', 'mean_gold_diff']
+    X_df = pd.DataFrame(columns=columns)
     for i in range(len(scored_df)):
-        players = [scored_df.iloc[i]['name'], scored_df.iloc[i]['name 2'], scored_df.iloc[i]['name 3'], scored_df.iloc[i]['name 4'],
-                   scored_df.iloc[i]['name 5'], scored_df.iloc[i]['name 6'], scored_df.iloc[i]['name 7'], scored_df.iloc[i]['name 8'],
-                   scored_df.iloc[i]['name 9'], scored_df.iloc[i]['name 10']]
-        game_matrix = []
-        for player in players:
-            for j in range(len(games_players)):
-                if player == games_players.iloc[j]['username']:
-                    player = games_players.iloc[j]
-                    player = Player(
-                        id=player.username,
-                        mmr=None,
-                        win_rate=player.winrate,
-                        games_played=player.games_won,  # NOT PLAYED
-                        role=player.most_played_role,
-                        rank=player.rank,
-                        division=player.division,
-                        lp=player.lp,
-                        kills=player.kills,
-                        death=player.death,
-                        assists=player.assists,
-                        avg_creeps_per_min=player.avg_creeps_per_min,
-                        avg_gold_per_min=player.avg_gold_per_min,
-                        calculated_kda=None
-                    )
-                    player.mmr = calculate_mmr(player.__dict__)
-                    player.calculated_kda = calculate_kda(player.__dict__)
-                    game_matrix.append(
-                        [max(player.mmr / matchmaking.MMR_SCALE - 0.8, 0.0) * 5.0, min(max(player.win_rate / matchmaking.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0), player.games_played / matchmaking.GAMES_SCALE,
-                         player.calculated_kda / matchmaking.KDA_SCALE, player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
-                         player.avg_gold_per_min / matchmaking.GOLD_SCALE])
-        game_matrix = np.array(game_matrix)
-        # print(game_matrix)
-        # calculate variance between the different players stats
-        variance = np.var(game_matrix, axis=0)
-        # print(variance)
-        # calculate the norm of the variance
-        norm = np.linalg.norm(variance)
-        scored_df.loc[i, 'lineup_score'] = 1 / norm
+        row = scored_df.iloc[i]
+        game_matrix, game_matrix_dicts = create_matrix_for_game(row, games_players)
+        variance_vec, variance_norm = calculate_lineup_variance(game_matrix)
 
-    filtered_scored_df = scored_df[scored_df['lineup_score'] <= 32]
-    filtered_scored_df['lineup_score'] = filtered_scored_df['lineup_score'] * 3.0
 
-    return filtered_scored_df
+
+
+        var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold = variance_vec
+        normed_var = variance_norm
+
+        maximal_mmr_diff = calculate_maximal_diff(game_matrix_dicts, feature='mmr', role_equal=False)
+        maximal_kda_diff = calculate_maximal_diff(game_matrix_dicts, feature='calculated_kda', role_equal=True)
+        maximal_win_rate_diff = calculate_maximal_diff(game_matrix_dicts, feature='win_rate', role_equal=False)
+        maximal_games_played_diff = calculate_maximal_diff(game_matrix_dicts, feature='games_played', role_equal=False)
+        maximal_creeps_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_creeps_per_min', role_equal=True)
+        maximal_gold_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_gold_per_min', role_equal=True)
+
+        max_mmr_diff = calculate_max_diff(game_matrix_dicts, feature='mmr')
+        max_kda_diff = calculate_max_diff(game_matrix_dicts, feature='calculated_kda')
+        max_win_rate_diff = calculate_max_diff(game_matrix_dicts, feature='win_rate')
+        max_games_played_diff = calculate_max_diff(game_matrix_dicts, feature='games_played')
+        max_creeps_diff = calculate_max_diff(game_matrix_dicts, feature='avg_creeps_per_min')
+        max_gold_diff = calculate_max_diff(game_matrix_dicts, feature='avg_gold_per_min')
+
+        mean_mmr_diff = calculate_mean_diff(game_matrix_dicts, feature='mmr')
+        mean_kda_diff = calculate_mean_diff(game_matrix_dicts, feature='calculated_kda')
+        mean_win_rate_diff = calculate_mean_diff(game_matrix_dicts, feature='win_rate')
+        mean_games_played_diff = calculate_mean_diff(game_matrix_dicts, feature='games_played')
+        mean_creeps_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_creeps_per_min')
+        mean_gold_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_gold_per_min')
+
+        # X_df.loc[i] = [var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold, normed_var,
+        #                maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff, maximal_games_played_diff,
+        #                maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
+        #                max_games_played_diff, max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
+        #                mean_win_rate_diff, mean_games_played_diff, mean_creeps_diff, mean_gold_diff]
+
+        X_df.loc[i] = [var_mmr, var_win_rate, var_kda, var_creeps, normed_var,
+                       maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff,
+                       maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
+                       max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
+                       mean_win_rate_diff, mean_creeps_diff, mean_gold_diff]
+
+    return X_df
+
+
+def backward_select_features_by_aic(X_df, Y_df):
+    """
+    Select features using backward selection based on AIC and build a linear regression model.
+
+    Parameters:
+    - X_df: pd.DataFrame, explanatory features (columns) for samples (rows).
+    - Y_df: pd.DataFrame, one-column DataFrame of the explained variable values.
+
+    Returns:
+    - chosen_features: List of feature names selected by AIC.
+    - aic_score: The AIC score of the best feature subset.
+    - model: The LinearRegression model trained on the chosen features.
+    """
+    # Ensure Y_df is a Series for simplicity
+    Y = Y_df.squeeze()
+
+    # Start with all features
+    selected_features = list(X_df.columns)
+    current_aic = float('inf')
+    n_samples = X_df.shape[0]
+
+    while True:
+        best_candidate_aic = float('inf')
+        worst_candidate_feature = None
+
+        # Try removing each feature one by one
+        for feature in selected_features:
+            candidate_features = [f for f in selected_features if f != feature]
+            X_subset = X_df[candidate_features]
+
+            if X_subset.empty:
+                continue
+
+            # Fit the model
+            model = LinearRegression()
+            model.fit(X_subset, Y)
+
+            # Predict and calculate RSS
+            predictions = model.predict(X_subset)
+            rss = mean_squared_error(Y, predictions) * n_samples
+
+            # Calculate AIC
+            n_features = len(candidate_features)
+            aic = n_samples * np.log(rss / n_samples) + 0.5 * n_features
+
+            # Update the best candidate to remove
+            if aic < best_candidate_aic:
+                best_candidate_aic = aic
+                worst_candidate_feature = feature
+
+        # Decide whether to remove a feature
+        if best_candidate_aic < current_aic:
+            current_aic = best_candidate_aic
+            selected_features.remove(worst_candidate_feature)
+        else:
+            # Stop if no improvement in AIC
+            break
+
+    # Final model with selected features
+    X_final = X_df[selected_features]
+    final_model = LinearRegression()
+    final_model.fit(X_final, Y)
+
+    # Return the results
+    return selected_features, current_aic, final_model
+
+
+# import statsmodels.api as sm
+#
+#
+# def show_model_statistics(X_df, Y_df, chosen_features, model):
+#     # Prepare the data
+#     X_selected = X_df[chosen_features]
+#     X_selected_with_const = sm.add_constant(X_selected)  # Add constant for intercept
+#
+#     # Fit the statsmodels OLS (Ordinary Least Squares) model
+#     sm_model = sm.OLS(Y_df, X_selected_with_const).fit()
+#
+#     # Display model summary
+#     print(sm_model.summary())
+
+
+def plot_residuals(X_df, Y_df, chosen_features, model):
+    # Predictions
+    X_selected = X_df[chosen_features]
+    predictions = model.predict(X_selected)
+    residuals = Y_df.squeeze() - predictions
+
+    # Plot residuals
+    plt.figure(figsize=(8, 6))
+    plt.scatter(predictions, residuals, alpha=0.7)
+    plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
+    plt.title('Residual Plot')
+    plt.xlabel('Predicted Values')
+    plt.ylabel('Residuals')
+    plt.show()
+
+
+def plot_actual_vs_predicted(X_df, Y_df, chosen_features, model):
+    # Predictions
+    X_selected = X_df[chosen_features]
+    predictions = model.predict(X_selected)
+
+    # Plot actual vs predicted
+    plt.figure(figsize=(8, 6))
+    plt.scatter(Y_df, predictions, alpha=0.7)
+    plt.plot([Y_df.min(), Y_df.max()], [Y_df.min(), Y_df.max()], 'r--')  # Diagonal line
+    plt.title('Actual vs Predicted')
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.show()
+
+
+def plot_feature_importance(chosen_features, model):
+    coefficients = model.coef_
+
+    plt.figure(figsize=(8, 6))
+    plt.barh(chosen_features, coefficients, alpha=0.7)
+    plt.title('Feature Importance')
+    plt.xlabel('Coefficient Value')
+    plt.ylabel('Features')
+    plt.show()
 
 
 def main():
     games_data = pd.read_csv('Games_data_raw_filtered.csv')
     games_data = process_games_data(games_data)
-    scored_df = calculate_matchmaking_score(games_data)
+    scored_df = calculate_game_score(games_data)
 
-    # scored_df.to_csv('output_with_matchmaking_score.csv', index=False)
+    # scored_df.to_csv('output_with_game_score.csv', index=False)
 
     games_players = pd.read_csv("games_players_data_filtered.csv")
-    scored_df = calculate_lineup_score(scored_df, games_players)
+    # scored_df = calculate_lineup_variance(scored_df, games_players)
+    X_df = calculate_lineup_features(scored_df, games_players)
+    Y_df = scored_df['game_score']
 
-    print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'matchmaking_score', 'lineup_score']].head())
-    # scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'matchmaking_score']].to_csv('scored_df.csv')
-    correlation = scored_df['matchmaking_score'].corr(scored_df['lineup_score'])
-    print(f"correlation: {correlation}")
+    chosen_features, AIC_score, model = backward_select_features_by_aic(X_df, Y_df)
 
-    plt.scatter(scored_df['matchmaking_score'], scored_df['lineup_score'])
-    plt.title('Relationship between matchmaking_score and lineup_score')
-    plt.xlabel('matchmaking_score')
-    plt.ylabel('lineup_score')
-    plt.grid(True)
-    plt.show()
+
+    print(f"chosen_features: {chosen_features}")
+    print(f"AIC_score: {AIC_score}")
+
+    # # Call the function with selected features and model
+    # show_model_statistics(X_df, Y_df, chosen_features, model)
+
+    plot_residuals(X_df, Y_df, chosen_features, model)
+
+    plot_actual_vs_predicted(X_df, Y_df, chosen_features, model)
+
+    plot_feature_importance(chosen_features, model)
+
+    print(f"weighs: {model.coef_}")
+
+    # print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'game_score', 'lineup_score']].head())
+    # # scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'game_score']].to_csv('scored_df.csv')
+    # correlation = scored_df['game_score'].corr(scored_df['lineup_score'])
+    # print(f"correlation: {correlation}")
+    #
+    # plt.scatter(scored_df['game_score'], scored_df['lineup_score'])
+    # plt.title('Relationship between game_score and lineup_score')
+    # plt.xlabel('game_score')
+    # plt.ylabel('lineup_score')
+    # plt.grid(True)
+    # plt.show()
 
 
 if __name__ == '__main__':
