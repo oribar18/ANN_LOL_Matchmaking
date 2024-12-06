@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
 import re
-import matchmaking
-from matchmaking import Player
-from matchmaking import calculate_kda
-from matchmaking import calculate_mmr
+from data_classes import Player
+from utils import calculate_kda, calculate_mmr
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+import utils
 # MMR_SCALE = 3000.0
 # GAMES_SCALE = 1000.0
 # WINRATE_SCALE = 100.0
@@ -212,12 +211,12 @@ def create_matrix_for_game(game_row, games_players):
                 player.mmr = calculate_mmr(player.__dict__)
                 player.calculated_kda = calculate_kda(player.__dict__)
                 game_matrix.append(
-                    [max(player.mmr / matchmaking.MMR_SCALE - 0.8, 0.0) * 5.0,
-                     min(max(player.win_rate / matchmaking.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0),
-                     player.games_played / matchmaking.GAMES_SCALE,
-                     player.calculated_kda / matchmaking.KDA_SCALE,
-                     player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
-                     player.avg_gold_per_min / matchmaking.GOLD_SCALE])
+                    [max(player.mmr / utils.MMR_SCALE - 0.8, 0.0) * 5.0,
+                     min(max(player.win_rate / utils.WINRATE_SCALE - 0.5, 0.0) * 3.0, 1.0),
+                     player.games_played / utils.GAMES_SCALE,
+                     player.calculated_kda / utils.KDA_SCALE,
+                     player.avg_creeps_per_min / utils.CREEPS_SCALE,
+                     player.avg_gold_per_min / utils.GOLD_SCALE])
                 # game_matrix.append(
                 #     [player.mmr / matchmaking.MMR_SCALE,
                 #      player.win_rate / matchmaking.WINRATE_SCALE,
@@ -225,13 +224,13 @@ def create_matrix_for_game(game_row, games_players):
                 #      player.calculated_kda / matchmaking.KDA_SCALE,
                 #      player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
                 #      player.avg_gold_per_min / matchmaking.GOLD_SCALE])
-                player_dict_filtered = {'mmr': player.mmr / matchmaking.MMR_SCALE,
-                                        'win_rate': player.win_rate / matchmaking.WINRATE_SCALE,
-                                        'games_played': player.games_played / matchmaking.GAMES_SCALE,
+                player_dict_filtered = {'mmr': player.mmr / utils.MMR_SCALE,
+                                        'win_rate': player.win_rate / utils.WINRATE_SCALE,
+                                        'games_played': player.games_played / utils.GAMES_SCALE,
                                         'role': player.role,
-                                        'calculated_kda': player.calculated_kda / matchmaking.KDA_SCALE,
-                                        'avg_creeps_per_min': player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
-                                        'avg_gold_per_min': player.avg_gold_per_min / matchmaking.GOLD_SCALE}
+                                        'calculated_kda': player.calculated_kda / utils.KDA_SCALE,
+                                        'avg_creeps_per_min': player.avg_creeps_per_min / utils.CREEPS_SCALE,
+                                        'avg_gold_per_min': player.avg_gold_per_min / utils.GOLD_SCALE}
                 game_matrix_dicts.append(player_dict_filtered)
     game_matrix = np.array(game_matrix)
     return game_matrix, game_matrix_dicts
