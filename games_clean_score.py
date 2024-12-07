@@ -24,7 +24,7 @@ from sklearn.metrics import mean_squared_error
 BLUE_TEAM_SUFFIXES = ['', ' 3', ' 5', ' 7', ' 9']
 RED_TEAM_SUFFIXES = [' 2', ' 4', ' 6', ' 8', ' 10']
 STAT_COLUMNS = ['kills', 'deaths', 'assists', 'creeps', 'gold']
-PENALTY_WEIGHT = 0
+PENALTY_WEIGHT = 0.15
 
 
 def create_suffix_to_role_mapping():
