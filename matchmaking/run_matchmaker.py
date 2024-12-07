@@ -79,7 +79,7 @@ def test_matchmaker(active_features_option='mmr, win_rate, games_played', player
 
 def main():
     # Load players data
-    players = pd.read_csv('league_of_graphs_players_filtered.csv')
+    players = pd.read_csv('data/league_of_graphs_players_filtered.csv')
 
     # Configuration
     num_matches = 10

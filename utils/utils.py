@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import re
 
 # Constants
 MMR_SCALE = 3000.0
@@ -10,6 +12,13 @@ ASSISTS_SCALE = 100.0
 CREEPS_SCALE = 10.0
 GOLD_SCALE = 1000.0
 KDA_SCALE = 10.0
+PENALTY_WEIGHT = 0.15
+STAT_COLUMNS = ['kills', 'deaths', 'assists', 'creeps', 'gold']
+# Blue odd, Red even
+BLUE_TEAM_SUFFIXES = ['', ' 3', ' 5', ' 7', ' 9']
+RED_TEAM_SUFFIXES = [' 2', ' 4', ' 6', ' 8', ' 10']
+
+
 
 
 def calculate_mmr(player):
@@ -60,3 +69,60 @@ def normalize_features(features):
         normalized_features_np[5] = normalized_features_np[5] * scales[5] / scales[8]
 
     return normalized_features_np
+
+
+def parse_game_duration(duration_str):
+    """
+    Parse game duration string into total minutes.
+
+    Args:
+        duration_str (str): Game duration in format like '(24:27)'
+
+    Returns:
+        float: Total game duration in minutes
+    """
+    # Remove parentheses if present
+    duration_str = duration_str.strip('()')
+
+    try:
+        # Split the time string by ':'
+        minutes, seconds = map(int, duration_str.split(':'))
+
+        # Convert to total minutes, rounding seconds
+        total_minutes = minutes + (seconds / 60)
+
+        return total_minutes
+    except (ValueError, TypeError):
+        # Return NaN if parsing fails
+        return np.nan
+
+
+def extract_cs_gold(value):
+    """Extract CS and gold values from strings like '202 CS - 8.7k gold'"""
+    if pd.isna(value):
+        return pd.NA, pd.NA
+
+    # Extract numbers using regex
+    cs_match = re.search(r'(\d+)\s*CS', value)
+    gold_match = re.search(r'(\d+\.?\d*)k?\s*gold', value)
+
+    cs = int(cs_match.group(1)) if cs_match else pd.NA
+
+    if gold_match:
+        gold_str = gold_match.group(1)
+        gold = float(gold_str) * 1000
+    else:
+        gold = pd.NA
+
+    return cs, gold
+
+
+def calculate_team_stats(df):
+    for stat in STAT_COLUMNS:
+        df[f'blue_{stat}'] = sum(df[f'{stat}{suffix}'] for suffix in BLUE_TEAM_SUFFIXES)
+        df[f'red_{stat}'] = sum(df[f'{stat}{suffix}'] for suffix in RED_TEAM_SUFFIXES)
+    return df
+
+
+
+
