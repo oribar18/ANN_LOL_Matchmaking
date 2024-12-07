@@ -1,26 +1,45 @@
-from matchmaking.run_matchmaker import run as matchmaker
-from matchmaking.games_clean_score import run as create_model
+import matplotlib.pyplot as plt
 from data_processing.lineup_analysis import create_matrix_for_game
-import pandas as pd
 from matchmaking.model import COLUMNS
 from data_processing.games_data_processing import calculate_lineup_features
-
-players = pd.read_csv('../data/league_of_graphs_players_filtered.csv')
-matches = matchmaker()
-model, chosen_features = create_model()
-matching_scores = {}
-for feature in matches.keys():
-    matching_scores[feature] = []
-    X_df = pd.DataFrame(columns=COLUMNS)
-    for match in matches[feature]:
-        game_matrix, game_matrix_dicts = create_matrix_for_game(players, match=match)
-        X_df.loc[X_df.shape[0]] = calculate_lineup_features(game_matrix, game_matrix_dicts)
-    score = model.predict(X_df[chosen_features])
-    print("*"*100)
-    print("*"*100)
-    print(f"score: {score}")
-    print("*"*100)
-    print("*"*100)
+from statistics import mean
+from statistics import stdev
+import pandas as pd
 
 
-#match.team1[0].id
+def test_matched_games(players, matches, model, chosen_features):
+    matching_scores = {}
+    for features in matches.keys():
+        matching_scores[features] = {}
+        X_df = pd.DataFrame(columns=COLUMNS)
+        for match in matches[features]:
+            game_matrix, game_matrix_dicts = create_matrix_for_game(players, match=match)
+            X_df.loc[X_df.shape[0]] = calculate_lineup_features(game_matrix, game_matrix_dicts)
+        matching_scores[features]['scores'] = model.predict(X_df[chosen_features])
+        matching_scores[features]['mean'] = mean(matching_scores[features]['scores'])
+        matching_scores[features]['std'] = stdev(matching_scores[features]['scores'])
+
+    return matching_scores
+
+
+def stats_snd_graphs(matching_scores):
+    for features in matching_scores.keys():
+        print(f"Features: {features}")
+        print(f"\tMean: {matching_scores[features]['mean']}")
+        print(f"\tStd: {matching_scores[features]['std']}")
+        print("*"*30)
+
+    # plot graph for all scores by features
+
+    for features in matching_scores.keys():
+        x = range(len(matching_scores[features]['scores']))  # X-axis: indices of the list
+        plt.plot(x, matching_scores[features]['scores'], marker='o', linestyle='None', markersize=3, label=features)  # Line plot with markers
+
+    # Add legend and labels
+    plt.legend(fontsize=8)
+    plt.xlabel('Index')
+    plt.ylabel('Value')
+    plt.title('Points and Connecting Lines for Each List')
+
+    # Show the plot
+    plt.show()
