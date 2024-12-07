@@ -1,8 +1,8 @@
 from utils.utils import parse_game_duration, extract_cs_gold, calculate_team_stats
 import numpy as np
-import lineup_analysis
-from lineup_analysis import calculate_maximal_diff, calculate_max_diff, calculate_mean_diff
+from data_processing.lineup_analysis import calculate_maximal_diff, calculate_max_diff, calculate_mean_diff, calculate_lineup_variance, create_matrix_for_game, calculate_kda_variance, retrieve_players_rows, retrieve_players_names
 import pandas as pd
+from matchmaking.model import COLUMNS
 
 def process_games_data(df):
     if df is None or df.empty:
@@ -65,7 +65,7 @@ def calculate_game_score(df):
     # Ideal game duration around 30 minutes, with max score at 30 and decreasing as you move away
     scored_df['duration_score'] = np.exp(-((scored_df['game_duration_mins'] - 30) ** 2) / 200)
 
-    scored_df = lineup_analysis.calculate_kda_variance(scored_df)
+    scored_df = calculate_kda_variance(scored_df)
     # Ensure intra_team_penalty is normalized to be within 0-1 range
     max_penalty = scored_df['intra_team_penalty'].max()
     if max_penalty > 0:
@@ -107,66 +107,56 @@ def calculate_game_score(df):
 
 
 
-def calculate_lineup_features(scored_df, games_players):
-    team_1_locs = range(5)
-    team_2_locs = range(5, 10)
-    # columns = ['var_mmr', 'var_win_rate', 'var_games_played', 'var_kda', 'var_creeps', 'var_gold', 'normed_var',
-    #            'maximal_mmr_diff', 'maximal_kda_diff', 'maximal_win_rate_diff', 'maximal_games_played_diff',
-    #            'maximal_creeps_diff', 'maximal_gold_diff', 'max_mmr_diff', 'max_kda_diff', 'max_win_rate_diff',
-    #            'max_games_played_diff', 'max_creeps_diff', 'max_gold_diff', 'mean_mmr_diff', 'mean_kda_diff',
-    #            'mean_win_rate_diff', 'mean_games_played_diff', 'mean_creeps_diff', 'mean_gold_diff']
-
-    columns = ['var_mmr', 'var_win_rate', 'var_kda', 'var_creeps', 'normed_var', 'maximal_mmr_diff', 'maximal_kda_diff',
-               'maximal_win_rate_diff','maximal_creeps_diff',
-               'maximal_gold_diff', 'max_mmr_diff', 'max_kda_diff', 'max_win_rate_diff',
-               'max_creeps_diff', 'max_gold_diff', 'mean_mmr_diff', 'mean_kda_diff',
-               'mean_win_rate_diff', 'mean_creeps_diff', 'mean_gold_diff']
-    X_df = pd.DataFrame(columns=columns)
+def calculate_lineup_features_for_real_games(scored_df, games_players):
+    X_df = pd.DataFrame(columns=COLUMNS)
     for i in range(len(scored_df)):
         row = scored_df.iloc[i]
-        game_matrix, game_matrix_dicts = lineup_analysis.create_matrix_for_game(row, games_players)
-        variance_vec, variance_norm = lineup_analysis.calculate_lineup_variance(game_matrix)
-
-
-
-
-        var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold = variance_vec
-        normed_var = variance_norm
-
-        maximal_mmr_diff = calculate_maximal_diff(game_matrix_dicts, feature='mmr', role_equal=False)
-        maximal_kda_diff = calculate_maximal_diff(game_matrix_dicts, feature='calculated_kda', role_equal=True)
-        maximal_win_rate_diff = calculate_maximal_diff(game_matrix_dicts, feature='win_rate', role_equal=False)
-        maximal_games_played_diff = calculate_maximal_diff(game_matrix_dicts, feature='games_played', role_equal=False)
-        maximal_creeps_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_creeps_per_min', role_equal=True)
-        maximal_gold_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_gold_per_min', role_equal=True)
-
-        max_mmr_diff = calculate_max_diff(game_matrix_dicts, feature='mmr')
-        max_kda_diff = calculate_max_diff(game_matrix_dicts, feature='calculated_kda')
-        max_win_rate_diff = calculate_max_diff(game_matrix_dicts, feature='win_rate')
-        max_games_played_diff = calculate_max_diff(game_matrix_dicts, feature='games_played')
-        max_creeps_diff = calculate_max_diff(game_matrix_dicts, feature='avg_creeps_per_min')
-        max_gold_diff = calculate_max_diff(game_matrix_dicts, feature='avg_gold_per_min')
-
-        mean_mmr_diff = calculate_mean_diff(game_matrix_dicts, feature='mmr')
-        mean_kda_diff = calculate_mean_diff(game_matrix_dicts, feature='calculated_kda')
-        mean_win_rate_diff = calculate_mean_diff(game_matrix_dicts, feature='win_rate')
-        mean_games_played_diff = calculate_mean_diff(game_matrix_dicts, feature='games_played')
-        mean_creeps_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_creeps_per_min')
-        mean_gold_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_gold_per_min')
-
-        # X_df.loc[i] = [var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold, normed_var,
-        #                maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff, maximal_games_played_diff,
-        #                maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
-        #                max_games_played_diff, max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
-        #                mean_win_rate_diff, mean_games_played_diff, mean_creeps_diff, mean_gold_diff]
-
-        X_df.loc[i] = [var_mmr, var_win_rate, var_kda, var_creeps, normed_var,
-                       maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff,
-                       maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
-                       max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
-                       mean_win_rate_diff, mean_creeps_diff, mean_gold_diff]
+        game_matrix, game_matrix_dicts = create_matrix_for_game(games_players, game_row=row)
+        X_df.loc[i] = calculate_lineup_features(game_matrix, game_matrix_dicts)
 
     return X_df
+
+
+def calculate_lineup_features(game_matrix, game_matrix_dicts):
+    variance_vec, variance_norm = calculate_lineup_variance(game_matrix)
+
+    var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold = variance_vec
+    normed_var = variance_norm
+
+    maximal_mmr_diff = calculate_maximal_diff(game_matrix_dicts, feature='mmr', role_equal=False)
+    maximal_kda_diff = calculate_maximal_diff(game_matrix_dicts, feature='calculated_kda', role_equal=True)
+    maximal_win_rate_diff = calculate_maximal_diff(game_matrix_dicts, feature='win_rate', role_equal=False)
+    maximal_games_played_diff = calculate_maximal_diff(game_matrix_dicts, feature='games_played', role_equal=False)
+    maximal_creeps_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_creeps_per_min', role_equal=True)
+    maximal_gold_diff = calculate_maximal_diff(game_matrix_dicts, feature='avg_gold_per_min', role_equal=True)
+
+    max_mmr_diff = calculate_max_diff(game_matrix_dicts, feature='mmr')
+    max_kda_diff = calculate_max_diff(game_matrix_dicts, feature='calculated_kda')
+    max_win_rate_diff = calculate_max_diff(game_matrix_dicts, feature='win_rate')
+    max_games_played_diff = calculate_max_diff(game_matrix_dicts, feature='games_played')
+    max_creeps_diff = calculate_max_diff(game_matrix_dicts, feature='avg_creeps_per_min')
+    max_gold_diff = calculate_max_diff(game_matrix_dicts, feature='avg_gold_per_min')
+
+    mean_mmr_diff = calculate_mean_diff(game_matrix_dicts, feature='mmr')
+    mean_kda_diff = calculate_mean_diff(game_matrix_dicts, feature='calculated_kda')
+    mean_win_rate_diff = calculate_mean_diff(game_matrix_dicts, feature='win_rate')
+    mean_games_played_diff = calculate_mean_diff(game_matrix_dicts, feature='games_played')
+    mean_creeps_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_creeps_per_min')
+    mean_gold_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_gold_per_min')
+
+    # features_row = [var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold, normed_var,
+    #                maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff, maximal_games_played_diff,
+    #                maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
+    #                max_games_played_diff, max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
+    #                mean_win_rate_diff, mean_games_played_diff, mean_creeps_diff, mean_gold_diff]
+    features_row = [var_mmr, var_win_rate, var_kda, var_creeps, normed_var,
+                   maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff,
+                   maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
+                   max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
+                   mean_win_rate_diff, mean_creeps_diff, mean_gold_diff]
+
+
+    return features_row
 
 
 

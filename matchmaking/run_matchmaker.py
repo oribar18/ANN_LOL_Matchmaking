@@ -3,33 +3,16 @@ import numpy as np
 import pandas as pd
 from data_processing.data_classes import Player
 from matchmaking.cktree_matchmaker import CktreeMatchmaker
-from utils import calculate_mmr, calculate_kda
+from utils.utils import calculate_mmr, calculate_kda
+from data_processing.players_processing import process_player
 
 
 def test_matchmaker(active_features_option='mmr, win_rate, games_played', players=None):
     matchmaker = CktreeMatchmaker()
-    active_payers = players.sample(n=180)
+    active_players = players.copy(deep=True)
 
-    for player in active_payers.itertuples():
-        player_obj = Player(
-            id=player.username,
-            mmr=None,
-            win_rate=player.winrate,
-            games_played=player.games_won,
-            role=player.most_played_role,
-            rank=player.rank,
-            division=player.division,
-            lp=player.lp,
-            kills=player.kills,
-            death=player.death,
-            assists=player.assists,
-            avg_creeps_per_min=player.avg_creeps_per_min,
-            avg_gold_per_min=player.avg_gold_per_min,
-            calculated_kda=None
-        )
-        player_obj.mmr = calculate_mmr(player_obj.__dict__)
-        player_obj.calculated_kda = calculate_kda(player_obj.__dict__)
-
+    for player in active_players.itertuples():
+        player_obj = process_player(player)
         active_features_dict = {
             'mmr, win_rate, games_played': [player_obj.mmr, player_obj.win_rate, player_obj.games_played],
             'mmr': [player_obj.mmr],
@@ -77,12 +60,12 @@ def test_matchmaker(active_features_option='mmr, win_rate, games_played', player
         print("Could not find balanced teams")
 
 
-def main():
+def run():
     # Load players data
     players = pd.read_csv('../data/league_of_graphs_players_filtered.csv')
 
     # Configuration
-    num_matches = 10
+    num_matches = 250
     active_features_options = [
         'mmr, win_rate, games_played',
         'mmr',
@@ -91,14 +74,26 @@ def main():
     ]
 
     # Run matches for each feature set
-    matches = []
+    matches = {}
     for option in active_features_options:
+        players_to_match = players.copy(deep=True)
+        matches[option] = []
         print(f"Testing with {option} features:")
         for _ in range(num_matches):
-            match = test_matchmaker(option, players)
+            match = test_matchmaker(option, players_to_match)
             if match:
-                matches.append(match)
+                matches[option].append(match)
+                for player in match.team1:
+                    players_to_match = players_to_match[players_to_match['username'] != player.id]
+                for player in match.team2:
+                    players_to_match = players_to_match[players_to_match['username'] != player.id]
         print("*" * 100)
+
+    return matches
+
+
+def main():
+    matches = run()
 
 
 if __name__ == "__main__":

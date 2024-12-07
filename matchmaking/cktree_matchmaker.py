@@ -1,7 +1,7 @@
 from typing import List, Optional
 import numpy as np
 from data_processing.data_classes import Player, Match
-from role_queue import RoleQueue
+from matchmaking.role_queue import RoleQueue
 
 
 class CktreeMatchmaker:
