@@ -1,15 +1,15 @@
 import pandas as pd
-from games_data_processing import process_games_data,calculate_game_score, calculate_lineup_features
-from model import backward_select_features_by_aic, plot_residuals, plot_feature_importance, plot_actual_vs_predicted
+from data_processing.games_data_processing import process_games_data,calculate_game_score, calculate_lineup_features
+from matchmaking.model import backward_select_features_by_aic, plot_residuals, plot_feature_importance, plot_actual_vs_predicted
 
 def main():
-    games_data = pd.read_csv('data/games_data_raw_filtered.csv')
+    games_data = pd.read_csv('../data/games_data_raw_filtered.csv')
     games_data = process_games_data(games_data)
     scored_df = calculate_game_score(games_data)
 
     # scored_df.to_csv('output_with_game_score.csv', index=False)
 
-    games_players = pd.read_csv("data/games_players_data_filtered.csv")
+    games_players = pd.read_csv("../data/games_players_data_filtered.csv")
     # scored_df = calculate_lineup_variance(scored_df, games_players)
     X_df = calculate_lineup_features(scored_df, games_players)
     Y_df = scored_df['game_score']

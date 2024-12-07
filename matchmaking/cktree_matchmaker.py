@@ -1,6 +1,6 @@
 from typing import List, Optional
 import numpy as np
-from data_classes import Player, Match
+from data_processing.data_classes import Player, Match
 from role_queue import RoleQueue
 
 

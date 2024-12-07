@@ -1,8 +1,8 @@
 from typing import List, Optional, Tuple
 import numpy as np
 from scipy.spatial import cKDTree
-from data_classes import Player
-from utils import normalize_features
+from data_processing.data_classes import Player
+from utils.utils import normalize_features
 
 
 class RoleQueue:

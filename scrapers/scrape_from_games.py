@@ -156,4 +156,4 @@ def scrape_players_from_games(file_path):
 
 # Run the script
 if __name__ == '__main__':
-    scrape_players_from_games('data/games_data_raw.csv')
+    scrape_players_from_games('../data/games_data_raw.csv')

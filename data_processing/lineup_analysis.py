@@ -1,5 +1,5 @@
 import numpy as np
-from data_classes import Player
+from data_processing.data_classes import Player
 from utils.utils import calculate_kda, calculate_mmr, utils
 
 
