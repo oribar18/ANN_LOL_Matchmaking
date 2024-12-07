@@ -5,7 +5,9 @@ import matchmaking
 from matchmaking import Player
 from matchmaking import calculate_kda
 from matchmaking import calculate_mmr
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 # MMR_SCALE = 3000.0
@@ -22,6 +24,29 @@ from sklearn.metrics import mean_squared_error
 BLUE_TEAM_SUFFIXES = ['', ' 3', ' 5', ' 7', ' 9']
 RED_TEAM_SUFFIXES = [' 2', ' 4', ' 6', ' 8', ' 10']
 STAT_COLUMNS = ['kills', 'deaths', 'assists', 'creeps', 'gold']
+PENALTY_WEIGHT = 0
+
+
+def create_suffix_to_role_mapping():
+    """
+    Create a dictionary mapping suffixes to player roles.
+
+    Returns:
+        dict: A dictionary where keys are suffixes and values are roles.
+    """
+    suffix_to_role = {
+        '': 'Top',
+        ' 6': 'Top',
+        ' 2': 'Jungler',
+        ' 7': 'Jungler',
+        ' 3': 'Mid',
+        ' 8': 'Mid',
+        ' 4': 'AD Carry',
+        ' 9': 'AD Carry',
+        ' 5': 'Support',
+        ' 10': 'Support'
+    }
+    return suffix_to_role
 
 
 def process_games_data(df):
@@ -108,6 +133,26 @@ def calculate_team_stats(df):
     return df
 
 
+def calculate_kda_variance(df):
+    # Calculate KDA for each player
+    for i in range(1, 11):
+        suffix = '' if i == 1 else f' {i}'
+        suffix_to_role = create_suffix_to_role_mapping()
+        role = suffix_to_role.get(suffix, 'Unknown')
+        df[f'kda{suffix}'] = df.apply(lambda row: calculate_kda({
+            'kills': row[f'kills{suffix}'],
+            'death': row[f'deaths{suffix}'],
+            'assists': row[f'assists{suffix}'],
+            'role': role
+        }), axis=1)
+
+    # Calculate intra-team variance
+    df['blue_kda_variance'] = df[[f'kda{suffix}' for suffix in BLUE_TEAM_SUFFIXES]].var(axis=1)
+    df['red_kda_variance'] = df[[f'kda{suffix}' for suffix in RED_TEAM_SUFFIXES]].var(axis=1)
+    df['intra_team_penalty'] = df['blue_kda_variance'] + df['red_kda_variance']
+    return df
+
+
 def calculate_game_score(df):
     """
     Calculate a matchmaking quality score based on game balance metrics.
@@ -154,6 +199,14 @@ def calculate_game_score(df):
     # Ideal game duration around 30 minutes, with max score at 30 and decreasing as you move away
     scored_df['duration_score'] = np.exp(-((scored_df['game_duration_mins'] - 30) ** 2) / 200)
 
+    scored_df = calculate_kda_variance(scored_df)
+    # Ensure intra_team_penalty is normalized to be within 0-1 range
+    max_penalty = scored_df['intra_team_penalty'].max()
+    if max_penalty > 0:
+        scored_df['normalized_penalty'] = scored_df['intra_team_penalty'] / max_penalty
+    else:
+        scored_df['normalized_penalty'] = 0  # If there's no variance, no penalty
+
     # Adjust weights dynamically based on duration_score
     def dynamic_weights(duration_score):
         if duration_score < 0.65:  # If the duration score is low
@@ -166,18 +219,23 @@ def calculate_game_score(df):
         weights = dynamic_weights(row['duration_score'])
         kill_weight, gold_weight, assists_weight, creeps_weight, duration_weight = weights
 
-        return (
-                       kill_weight * row['kill_diff_score'] +
-                       gold_weight * row['gold_diff_score'] +
-                       assists_weight * row['assists_diff_score'] +
-                       creeps_weight * row['creeps_diff_score'] +
-                       duration_weight * row['duration_score']
-               ) * 100  # Scale to 0-100
+        base_score = (
+                kill_weight * row['kill_diff_score'] +
+                gold_weight * row['gold_diff_score'] +
+                assists_weight * row['assists_diff_score'] +
+                creeps_weight * row['creeps_diff_score'] +
+                duration_weight * row['duration_score']
+        )
+        return base_score * 100
 
     # Calculate the matchmaking score dynamically for each row
     scored_df['game_score'] = scored_df.apply(calculate_game_score_with_dynamic_weights, axis=1)
 
-    scored_df['game_score'] = scored_df['game_score'].round(2)
+    # Subtract penalty in the 0-1 range
+    # scored_df['game_score'] -= scored_df['normalized_penalty'] * PENALTY_WEIGHT * 100
+
+    # Scale to 0-100 after penalty adjustment
+    scored_df['game_score'] = scored_df['game_score'].clip(0, 100).round(2)
 
     return scored_df
 
@@ -235,6 +293,7 @@ def create_matrix_for_game(game_row, games_players):
                 game_matrix_dicts.append(player_dict_filtered)
     game_matrix = np.array(game_matrix)
     return game_matrix, game_matrix_dicts
+
 
 def calculate_lineup_variance(game_matrix):
     variance_vec = np.var(game_matrix, axis=0)
@@ -493,6 +552,7 @@ def main():
     plot_feature_importance(chosen_features, model)
 
     print(f"weighs: {model.coef_}")
+
 
     # print(scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'game_score', 'lineup_score']].head())
     # # scored_df[['kill_diff', 'gold_diff', 'gameDuration', 'duration_score', 'kill_diff_score', 'gold_diff_score',  'game_score']].to_csv('scored_df.csv')
