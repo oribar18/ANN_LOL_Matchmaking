@@ -73,7 +73,7 @@ def main():
     # Split the dataset
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Logistic Regression
+    # Linear Regression
     lr_model = LinearRegression()
     lr_predictions, lr_rmse, lr_r2, lr_model = evaluate_model(lr_model, X_train, X_test, y_train, y_test, "Linear Regression")
     plot_results(y_test, lr_predictions, "Linear Regression")
