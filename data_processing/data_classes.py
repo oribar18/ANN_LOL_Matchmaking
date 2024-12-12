@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 import numpy as np
 
+
 @dataclass
 class Player:
     id: str
@@ -19,6 +20,7 @@ class Player:
     avg_gold_per_min: Optional[float] = None
     calculated_kda: Optional[float] = None
     features: Optional[np.ndarray] = None
+
 
 @dataclass
 class Match:

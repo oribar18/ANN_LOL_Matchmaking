@@ -1,14 +1,24 @@
-from pydoc import plain
-
 import numpy as np
 import pandas as pd
-from data_processing.data_classes import Player
 from data_processing.players_processing import process_player
 from utils import utils
-from utils.utils import calculate_kda, calculate_mmr
+from utils.utils import calculate_kda
 
 
 def retrieve_players_names(game_row=None, match=None):
+    """
+    Retrieve the names of players from either a game row or a match object.
+
+    Args:
+        game_row (pd.Series, optional): A row representing a game from the dataset.
+        match (object, optional): An object containing team1 and team2 player information.
+
+    Returns:
+        list: A list of player names.
+
+    Raises:
+        Exception: If neither game_row nor match is provided.
+    """
     if game_row is not None:
         team_1_players = ['name', 'name 3', 'name 5', 'name 7', 'name 9']
         team_2_players = ['name 2', 'name 4', 'name 6', 'name 8', 'name 10']
@@ -27,6 +37,16 @@ def retrieve_players_names(game_row=None, match=None):
 
 
 def retrieve_players_rows(games_players, players_names):
+    """
+    Retrieve rows of player data from the dataset corresponding to the given player names.
+
+    Args:
+        games_players (pd.DataFrame): The dataset containing player information.
+        players_names (list): List of player names to retrieve data for.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing rows of player data.
+    """
     game_players = pd.DataFrame(columns=games_players.columns)
 
     for player in players_names:
@@ -36,7 +56,17 @@ def retrieve_players_rows(games_players, players_names):
             game_players = pd.concat([game_players, pd.DataFrame([first_row])], ignore_index=True)
     return game_players
 
+
 def create_matrix_from_lineup(game_players):
+    """
+    Create a numerical matrix and dictionary representation from player data.
+
+    Args:
+        game_players (pd.DataFrame): DataFrame containing player information.
+
+    Returns:
+        tuple: A tuple containing a NumPy array (game_matrix) and a list of dictionaries (game_matrix_dicts).
+    """
     game_matrix = []
     game_matrix_dicts = []
     for player in game_players.itertuples():
@@ -48,13 +78,6 @@ def create_matrix_from_lineup(game_players):
              player.calculated_kda / utils.KDA_SCALE,
              player.avg_creeps_per_min / utils.CREEPS_SCALE,
              player.avg_gold_per_min / utils.GOLD_SCALE])
-        # game_matrix.append(
-        #     [player.mmr / matchmaking.MMR_SCALE,
-        #      player.win_rate / matchmaking.WINRATE_SCALE,
-        #      player.games_played / matchmaking.GAMES_SCALE,
-        #      player.calculated_kda / matchmaking.KDA_SCALE,
-        #      player.avg_creeps_per_min / matchmaking.CREEPS_SCALE,
-        #      player.avg_gold_per_min / matchmaking.GOLD_SCALE])
         player_dict_filtered = {'mmr': player.mmr / utils.MMR_SCALE,
                                 'win_rate': player.win_rate / utils.WINRATE_SCALE,
                                 'games_played': player.games_played / utils.GAMES_SCALE,
@@ -68,18 +91,49 @@ def create_matrix_from_lineup(game_players):
 
 
 def create_matrix_for_game(players, game_row=None, match=None):
+    """
+    Create a matrix representation for a game lineup.
+
+    Args:
+        players (pd.DataFrame): DataFrame containing player information.
+        game_row (pd.Series, optional): Row representing a game.
+        match (object, optional): Match object containing player information.
+
+    Returns:
+        tuple: A tuple containing a numerical matrix and a list of dictionaries.
+    """
     players_names = retrieve_players_names(game_row=game_row, match=match)
     game_players = retrieve_players_rows(players, players_names)
     game_matrix, game_matrix_dicts = create_matrix_from_lineup(game_players)
     return game_matrix, game_matrix_dicts
 
 def calculate_lineup_variance(game_matrix):
+    """
+    Calculate variance and norm of variance for a game lineup.
+
+    Args:
+        game_matrix (np.ndarray): Matrix representation of game lineup.
+
+    Returns:
+        tuple: A tuple containing variance vector and its norm.
+    """
     variance_vec = np.var(game_matrix, axis=0)
     variance_norm = np.linalg.norm(variance_vec)
     return tuple(variance_vec), variance_norm
 
 
 def calculate_maximal_diff(game_dicts, feature, role_equal):
+    """
+    Calculate the maximal difference for a specific feature between two teams.
+
+    Args:
+        game_dicts (list): List of dictionaries containing player data.
+        feature (str): Feature to calculate differences for.
+        role_equal (bool): Whether to consider only players with the same role.
+
+    Returns:
+        float: Maximal difference of the specified feature.
+    """
     team_1_locs = range(5)
     team_2_locs = range(5, 10)
     max_diff = 0
@@ -93,6 +147,16 @@ def calculate_maximal_diff(game_dicts, feature, role_equal):
 
 
 def calculate_max_diff(game_dicts, feature):
+    """
+    Calculate the maximum difference for a specific feature between teams.
+
+    Args:
+        game_dicts (list): List of dictionaries containing player data.
+        feature (str): Feature to calculate differences for.
+
+    Returns:
+        float: Maximum difference of the specified feature.
+    """
     team_1_locs = range(5)
     team_2_locs = range(5, 10)
     max_team_1 = max([game_dicts[j][feature] for j in team_1_locs])
@@ -101,6 +165,16 @@ def calculate_max_diff(game_dicts, feature):
 
 
 def calculate_mean_diff(game_dicts, feature):
+    """
+    Calculate the mean difference for a specific feature between teams.
+
+    Args:
+        game_dicts (list): List of dictionaries containing player data.
+        feature (str): Feature to calculate differences for.
+
+    Returns:
+        float: Mean difference of the specified feature.
+    """
     team_1_locs = range(5)
     team_2_locs = range(5, 10)
     mean_team_1 = sum([game_dicts[j][feature] for j in team_1_locs]) / len(team_1_locs)
@@ -131,6 +205,15 @@ def create_suffix_to_role_mapping():
 
 
 def calculate_kda_variance(df):
+    """
+    Calculate the variance in KDA for teams.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing game data.
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with KDA variance and intra-team penalty.
+    """
     # Calculate KDA for each player
     for i in range(1, 11):
         suffix = '' if i == 1 else f' {i}'

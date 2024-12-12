@@ -3,6 +3,19 @@ from data_processing.games_data_processing import process_games_data, calculate_
 from matchmaking.model import backward_select_features_by_aic, plot_residuals, plot_feature_importance, plot_actual_vs_predicted
 
 def run():
+    """
+    Process game data, train a regression model to predict game scores, and evaluate its performance.
+
+    This function performs the following steps:
+    - Reads and processes game data.
+    - Calculates game scores based on the processed data.
+    - Generates features for games using lineup features.
+    - Trains a regression model with backward feature selection to predict game scores.
+    - Evaluates the model using residual plots, actual vs. predicted values, and feature importance.
+
+    Returns:
+        tuple: A tuple containing the trained model and the chosen features.
+    """
     games_data = pd.read_csv('../data/games_data_raw_filtered.csv')
     games_data = process_games_data(games_data)
     scored_df = calculate_game_score(games_data)
@@ -33,6 +46,10 @@ def run():
 
 
 def main():
+    """
+    Main function to execute the workflow for processing game data, training the model,
+    and evaluating its performance.
+    """
     model, chosen_features = run()
 
 

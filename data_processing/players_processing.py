@@ -1,8 +1,18 @@
 from data_processing.data_classes import Player
-from data_processing.data_classes import Match
 from utils.utils import calculate_kda, calculate_mmr
 
 def process_player(player):
+    """
+    Process a player dictionary to create a Player object with computed attributes.
+
+    Args:
+        player (dict): A dictionary containing player attributes such as username, winrate,
+                       games_won, most_played_role, rank, division, lp, kills, deaths,
+                       assists, avg_creeps_per_min, and avg_gold_per_min.
+
+    Returns:
+        Player: An instance of the Player class with computed MMR and KDA attributes.
+    """
     player_obj = Player(
         id=player.username,
         mmr=None,

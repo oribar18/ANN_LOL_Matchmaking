@@ -8,6 +8,18 @@ import pandas as pd
 
 
 def test_matched_games(players, matches, model, chosen_features):
+    """
+    Evaluate matched games by calculating scores for each feature set using the provided model.
+
+    Args:
+        players (pd.DataFrame): The dataframe containing player data.
+        matches (dict): Dictionary where keys are feature subsets, and values are lists of matches.
+        model: The trained regression model for score prediction.
+        chosen_features (list): The selected features used by the model.
+
+    Returns:
+        dict: A dictionary with mean, standard deviation, and scores for each feature set.
+    """
     matching_scores = {}
     for features in matches.keys():
         matching_scores[features] = {}
@@ -23,6 +35,12 @@ def test_matched_games(players, matches, model, chosen_features):
 
 
 def stats_snd_graphs(matching_scores):
+    """
+    Display statistics and visualize scores for each feature set.
+
+    Args:
+        matching_scores (dict): Dictionary containing mean, standard deviation, and scores for each feature set.
+    """
     for features in matching_scores.keys():
         print(f"Features: {features}")
         print(f"\tMean: {matching_scores[features]['mean']}")

@@ -1,14 +1,11 @@
 import pandas as pd
-import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import matplotlib
-
 from data_processing.games_data_processing import calculate_lineup_features, process_games_data, calculate_game_score
-
 matplotlib.use('TkAgg')
 
 # Define high-impact features based on the importance plots
@@ -18,8 +15,16 @@ HIGH_IMPACT_FEATURES = [
     'mean_kda_diff', 'max_gold_diff'
 ]
 
+
 def plot_results(y_test, predictions, model_name):
-    """Plot actual vs predicted values."""
+    """
+    Plot actual vs predicted values for a given model.
+
+    Args:
+        y_test (array-like): True target values.
+        predictions (array-like): Predicted target values by the model.
+        model_name (str): Name of the model being plotted.
+    """
     plt.figure(figsize=(8, 6))
     plt.scatter(y_test, predictions, alpha=0.7)
     plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
@@ -28,8 +33,20 @@ def plot_results(y_test, predictions, model_name):
     plt.ylabel("Predicted Values")
     plt.show()
 
+
 def train_and_evaluate_model(X, y, model, model_name):
-    """Train the model and evaluate it."""
+    """
+    Train a machine learning model and evaluate its performance.
+
+    Args:
+        X (DataFrame): Feature set for training and testing.
+        y (Series): Target variable for training and testing.
+        model (object): The machine learning model to train.
+        model_name (str): Name of the model being trained.
+
+    Returns:
+        tuple: Predictions, true test values, and the trained model.
+    """
     # Split the dataset
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -47,8 +64,16 @@ def train_and_evaluate_model(X, y, model, model_name):
 
     return predictions, y_test, model
 
+
 def plot_feature_importance(features, importances, model_name):
-    """Plot feature importances."""
+    """
+    Plot feature importance for a trained model.
+
+    Args:
+        features (list): List of feature names.
+        importances (list): Corresponding feature importance values.
+        model_name (str): Name of the model.
+    """
     importance_df = pd.DataFrame({'Feature': features, 'Importance': importances})
     importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
@@ -60,7 +85,11 @@ def plot_feature_importance(features, importances, model_name):
     plt.savefig(f"{model_name}_feature_importance.png")
     plt.show()
 
+
 def main():
+    """
+    Main function to load data, train models, and evaluate results.
+    """
     games_data = pd.read_csv('../data/games_data_raw_filtered.csv')
     games_data = process_games_data(games_data)
     scored_df = calculate_game_score(games_data)
@@ -85,6 +114,7 @@ def main():
 
     # Plot XGBoost results
     plot_results(y_test_xgb, xgb_predictions, "XGBoost")
+
 
 if __name__ == '__main__':
     main()

@@ -1,13 +1,22 @@
 import time
 import numpy as np
 import pandas as pd
-from data_processing.data_classes import Player
 from matchmaking.cktree_matchmaker import CktreeMatchmaker
-from utils.utils import calculate_mmr, calculate_kda
 from data_processing.players_processing import process_player
 
 
 def test_matchmaker(active_features_option='mmr, win_rate, games_played', players=None):
+    """
+    Test the matchmaking system with a given feature set.
+
+    Args:
+        active_features_option (str): The feature set to be used for matchmaking.
+        players (pd.DataFrame): DataFrame containing player data.
+
+    Returns:
+        final_match (Match): The final match object containing two balanced teams,
+                             or None if a balanced match could not be formed.
+    """
     matchmaker = CktreeMatchmaker()
     active_players = players.copy(deep=True)
 
@@ -61,6 +70,12 @@ def test_matchmaker(active_features_option='mmr, win_rate, games_played', player
 
 
 def run():
+    """
+    Run matchmaking tests for multiple feature sets and gather results.
+
+    Returns:
+        dict: A dictionary mapping feature sets to the list of matches generated for each set.
+    """
     # Load players data
     players = pd.read_csv('../data/league_of_graphs_players_filtered.csv')
 

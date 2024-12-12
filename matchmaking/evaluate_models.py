@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
@@ -7,7 +6,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import matplotlib
-
 from data_processing.games_data_processing import calculate_lineup_features, process_games_data, calculate_game_score
 
 matplotlib.use('TkAgg')
@@ -18,6 +16,7 @@ HIGH_IMPACT_FEATURES = [
     'mean_creeps_diff', 'max_mmr_diff', 'maximal_mmr_diff',
     'mean_kda_diff', 'max_gold_diff'
 ]
+
 
 def evaluate_model(model, X_train, X_test, y_train, y_test, model_name):
     """Train and evaluate a model."""
@@ -35,8 +34,19 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, model_name):
 
     return predictions, rmse, r_squared, model
 
+
 def plot_results(y_test, predictions, model_name):
-    """Plot actual vs predicted values."""
+    """
+    Plot actual vs predicted values for a regression model.
+
+    Parameters:
+    - y_test (pd.Series): Actual target values.
+    - predictions (np.ndarray): Predicted target values.
+    - model_name (str): Name of the model for display purposes.
+
+    Returns:
+    None
+    """
     plt.figure(figsize=(8, 6))
     plt.scatter(y_test, predictions, alpha=0.7)
     plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
@@ -45,8 +55,19 @@ def plot_results(y_test, predictions, model_name):
     plt.ylabel("Predicted Values")
     plt.show()
 
+
 def plot_feature_importance(features, importances, model_name):
-    """Plot feature importances."""
+    """
+    Plot feature importances for a regression model.
+
+    Parameters:
+    - features (list of str): List of feature names.
+    - importances (np.ndarray): Array of feature importance values.
+    - model_name (str): Name of the model for display purposes.
+
+    Returns:
+    None
+    """
     importance_df = pd.DataFrame({'Feature': features, 'Importance': importances})
     importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
@@ -57,7 +78,20 @@ def plot_feature_importance(features, importances, model_name):
     plt.ylabel('Features')
     plt.show()
 
+
 def main():
+    """
+    Main function to evaluate different regression models on game score prediction.
+
+    Steps:
+    1. Load and preprocess the data.
+    2. Split the data into training and testing sets.
+    3. Train and evaluate Linear Regression, Random Forest, and XGBoost models.
+    4. Plot results and feature importance for each model.
+
+    Returns:
+    None
+    """
     # Load and process data
     games_data = pd.read_csv('../data/games_data_raw_filtered.csv')
     games_data = process_games_data(games_data)

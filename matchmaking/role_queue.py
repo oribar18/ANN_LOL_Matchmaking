@@ -6,7 +6,21 @@ from utils.utils import normalize_features
 
 
 class RoleQueue:
+    """
+       Represents a queue for a specific role in matchmaking, maintaining a KD-Tree for efficient search.
+
+       Attributes:
+           role (str): The role associated with the queue.
+           players (list): List of player feature vectors.
+           kd_tree (KDTree): KD-Tree for efficient nearest neighbor searches.
+       """
     def __init__(self, role: str):
+        """
+        Initializes a RoleQueue with a given role.
+
+        Args:
+            role (str): The role for this queue.
+        """
         self.role = role
         self.players: List[Player] = []
         self.tree: Optional[cKDTree] = None
@@ -24,7 +38,10 @@ class RoleQueue:
         self.needs_rebuild = True
 
     def rebuild_tree(self):
-        """Rebuild the KD-tree with current players."""
+        """
+        Rebuilds the KD-Tree using the current list of players in the queue.
+        This improves the efficiency of nearest neighbor searches.
+        """
         if not self.players or len(self.players) < 2:
             self.tree = None
             self.features = None
@@ -48,7 +65,18 @@ class RoleQueue:
                              k: int = 5,
                              mmr_threshold: float = 300,
                              player_id: str = None) -> List[Tuple[float, Player]]:
-        """Find k closest players using the KD-tree."""
+        """
+        Finds the k closest players using the KD-Tree.
+
+        Args:
+            target_features (np.ndarray): The feature vector of the target player.
+            k (int, optional): The number of closest players to find. Default is 5.
+            mmr_threshold (float, optional): Maximum MMR difference allowed. Default is 300.
+            player_id (Optional[str], optional): ID of the player to exclude from results. Default is None.
+
+        Returns:
+            List[Tuple[float, Player]]: A list of tuples containing distances and player objects of the k closest players.
+        """
         # This function is our ANN search
         if self.needs_rebuild:
             self.rebuild_tree()

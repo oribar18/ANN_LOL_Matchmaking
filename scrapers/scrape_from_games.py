@@ -1,3 +1,7 @@
+"""
+A module for scraping game and player data from League of Legends websites.
+"""
+
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -9,8 +13,14 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-# Initialize the Selenium WebDriver
+
 def get_driver():
+    """
+    Set up and return a Selenium WebDriver for Chrome.
+
+    Returns:
+        webdriver.Chrome: Configured Selenium WebDriver instance.
+    """
     chrome_options = Options()
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
@@ -19,8 +29,17 @@ def get_driver():
     return driver
 
 
-# Function to scrape player-specific page data
 def scrape_player_page(driver, url):
+    """
+    Scrape data from a player's page, including KDA, role, and winrate.
+
+    Args:
+        driver (webdriver.Chrome): Selenium WebDriver instance.
+        url (str): URL of the player's page.
+
+    Returns:
+        dict: A dictionary containing player-specific data (KDA, role, winrate, etc.).
+    """
     driver.get(url)
     try:
         WebDriverWait(driver, 10).until(
@@ -85,6 +104,17 @@ def scrape_player_page(driver, url):
 
 # Function to scrape champion-specific stats
 def scrape_champion_stats(driver, url, num_of_champs=5):
+    """
+    Scrape champion-specific stats from a player's page.
+
+    Args:
+        driver (webdriver.Chrome): Selenium WebDriver instance.
+        url (str): URL of the player's champion stats page.
+        num_of_champs (int, optional): Number of champions to scrape stats for. Defaults to 5.
+
+    Returns:
+        dict: A dictionary containing average creeps per minute and gold per minute.
+    """
     driver.get(url)
     try:
         WebDriverWait(driver, 10).until(
@@ -113,8 +143,16 @@ def scrape_champion_stats(driver, url, num_of_champs=5):
         return {'avg_creeps_per_min': "N/A", 'avg_gold_per_min': "N/A"}
 
 
-# Main scraping function
 def scrape_players_from_games(file_path):
+    """
+    Scrape player data from a CSV file containing game data.
+
+    Args:
+        file_path (str): Path to the CSV file containing game data.
+
+    Returns:
+        None: Saves the scraped data to a CSV file.
+    """
     games_df = pd.read_csv(file_path)
     player_columns = [col for col in games_df.columns if 'relative href' in col]
     players_data = []

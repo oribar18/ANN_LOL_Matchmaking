@@ -1,3 +1,7 @@
+"""
+A module for scraping player and champion data from League of Legends websites.
+"""
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -5,13 +9,18 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import pandas as pd
-import time
 
 
 # Set up Selenium WebDriver
 def get_driver():
+    """
+        Set up and return a Selenium WebDriver for Chrome.
+
+        Returns:
+            webdriver.Chrome: Configured Selenium WebDriver instance.
+    """
     chrome_options = Options()
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
@@ -23,8 +32,19 @@ def get_driver():
     return driver
 
 
-# Function to scrape champion-specific stats for a player
+
 def scrape_champion_stats(driver, username, num_of_champs):
+    """
+        Scrape average creeps and gold per minute for a given number of champions.
+
+        Args:
+            driver (webdriver.Chrome): Selenium WebDriver instance.
+            username (str): Username of the player.
+            num_of_champs (int): Number of champions to scrape data for.
+
+        Returns:
+            dict: A dictionary containing average creeps per minute and gold per minute.
+    """
     username = username.replace('#', '-')
     url = f'https://www.leagueofgraphs.com/summoner/champions/sg/{username}'
     driver.get(url)
@@ -78,8 +98,18 @@ def scrape_champion_stats(driver, username, num_of_champs):
         return {'avg_creeps_per_min': "N/A", 'avg_gold_per_min': "N/A"}
 
 
-# Function to scrape player-specific page data
+
 def scrape_player_page(driver, username):
+    """
+        Scrape player-specific data, including KDA and most-played role.
+
+        Args:
+            driver (webdriver.Chrome): Selenium WebDriver instance.
+            username (str): Username of the player.
+
+        Returns:
+            dict: A dictionary containing KDA and most-played role data.
+    """
     username = username.replace('#', '-')
     url = f'https://www.leagueofgraphs.com/summoner/sg/{username}'
     driver.get(url)
@@ -122,6 +152,12 @@ def scrape_player_page(driver, username):
 
 # Scrape player profiles data from multiple pages
 def scrape_player_profiles():
+    """
+    Scrape player profiles from multiple pages and save the data to a CSV file.
+
+    Returns:
+        list: A list of dictionaries containing player data.
+    """
     base_url = 'https://www.leagueofgraphs.com/rankings/summoners/sg/page-'
     driver = get_driver()
 
@@ -188,6 +224,9 @@ def scrape_player_profiles():
 
 # Main function
 def main():
+    """
+    Main entry point for the script. Scrapes player profiles and saves them to a CSV file.
+    """
     players = scrape_player_profiles()
 
     # Create DataFrame and save results

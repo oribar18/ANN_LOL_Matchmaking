@@ -4,6 +4,19 @@ import pandas as pd
 from evaluation import stats_snd_graphs, test_matched_games
 
 def main():
+    """
+    Main function to execute the matchmaking, scoring, and evaluation process.
+
+    Steps:
+    1. Load player data.
+    2. Generate matches using the matchmaking system.
+    3. Create and train a model to predict game scores.
+    4. Evaluate the generated matches using the trained model.
+    5. Display statistics and graphs for the evaluation.
+
+    Returns:
+        None
+    """
     players = pd.read_csv('../data/league_of_graphs_players_filtered.csv')
     matches = matchmaker()
     model, chosen_features = create_model()

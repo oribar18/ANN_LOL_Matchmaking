@@ -1,3 +1,8 @@
+"""
+Utility functions for data processing, KDA calculations, MMR calculations,
+and other operations required for matchmaking and game analysis.
+"""
+
 import numpy as np
 import pandas as pd
 import re
@@ -22,6 +27,16 @@ RED_TEAM_SUFFIXES = [' 2', ' 4', ' 6', ' 8', ' 10']
 
 
 def calculate_mmr(player):
+    """
+    Calculate the Matchmaking Rating (MMR) for a player.
+
+    Args:
+        player (dict): A dictionary containing player data, including:
+                       'rank', 'division', 'lp' (League Points), and 'win_rate'.
+
+    Returns:
+        float: The calculated MMR value based on rank, division, LP, and win rate.
+    """
     base_mmr = {
         'Iron': 200, 'Bronze': 800, 'Silver': 1000, 'Gold': 1200,
         'Platinum': 1500, 'Diamond': 1800, 'Master': 2200,
@@ -45,6 +60,17 @@ def calculate_mmr(player):
 
 
 def calculate_kda(player):
+    """
+    Calculate the Kill-Death-Assist (KDA) ratio for a player.
+
+    Args:
+        player (dict): A dictionary containing player stats with keys:
+                      'kills', 'death', 'assists', and optionally 'role'.
+
+    Returns:
+        float: The KDA ratio calculated as (kills + assists) / max(death, 1).
+               If 'death' is zero, it avoids division by zero.
+    """
     adj_deaths = max(1.0, player['death'])
 
     role_multipliers = {
@@ -62,6 +88,15 @@ def calculate_kda(player):
 
 
 def normalize_features(features):
+    """
+    Normalize selected features in a feature vector to predefined scales.
+
+    Args:
+        features (list): A list of feature values to normalize.
+
+    Returns:
+        np.ndarray: A normalized feature vector.
+    """
     scales = [MMR_SCALE, WINRATE_SCALE, GAMES_SCALE, CREEPS_SCALE,
               GOLD_SCALE, KILLS_SCALE, DEATHS_SCALE, ASSISTS_SCALE, KDA_SCALE]
     normalized_features_np = np.array([f / s for f, s in zip(features, scales) if f is not None])
@@ -98,7 +133,15 @@ def parse_game_duration(duration_str):
 
 
 def extract_cs_gold(value):
-    """Extract CS and gold values from strings like '202 CS - 8.7k gold'"""
+    """
+    Extract CS (Creep Score) and gold values from a string representation.
+
+    Args:
+        value (str): A string like '202 CS - 8.7k gold'.
+
+    Returns:
+        tuple: A tuple containing CS (int) and gold (float), or (pd.NA, pd.NA) if parsing fails.
+    """
     if pd.isna(value):
         return pd.NA, pd.NA
 
@@ -118,6 +161,16 @@ def extract_cs_gold(value):
 
 
 def calculate_team_stats(df):
+    """
+    Calculate aggregate team stats for blue and red teams.
+
+    Args:
+        df (pd.DataFrame): A DataFrame containing player stats with columns
+                           for individual stats (e.g., kills, deaths, assists).
+
+    Returns:
+        pd.DataFrame: The updated DataFrame with aggregated team stats for both teams.
+    """
     for stat in STAT_COLUMNS:
         df[f'blue_{stat}'] = sum(df[f'{stat}{suffix}'] for suffix in BLUE_TEAM_SUFFIXES)
         df[f'red_{stat}'] = sum(df[f'{stat}{suffix}'] for suffix in RED_TEAM_SUFFIXES)

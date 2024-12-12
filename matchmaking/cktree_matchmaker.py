@@ -5,7 +5,13 @@ from matchmaking.role_queue import RoleQueue
 
 
 class CktreeMatchmaker:
+    """
+    A class for matchmaking players into balanced teams using role-based queues and KD-tree searches.
+    """
     def __init__(self):
+        """
+        Initialize role queues for each player role.
+        """
         self.role_queues = {
             role: RoleQueue(role)
             for role in ["Jungler", "Support", "Mid", "Top", "AD Carry"]
@@ -16,6 +22,15 @@ class CktreeMatchmaker:
         self.role_queues[player.role].add_player(player)
 
     def _calculate_team_stats(self, team: List[Player]) -> dict:
+        """
+        Calculate statistics for a given team.
+
+        Args:
+            team (List[Player]): List of players in a team.
+
+        Returns:
+            dict: A dictionary containing average MMR, average win rate, and MMR spread.
+        """
         return {
             'avg_mmr': np.mean([p.mmr for p in team]),
             'avg_wr': np.mean([p.win_rate for p in team]),
@@ -24,7 +39,17 @@ class CktreeMatchmaker:
 
     def _is_balanced_match(self, team1: List[Player], team2: List[Player],
                            max_mmr_diff: float = 100) -> bool:
-        """Check if two teams are balanced."""
+        """
+        Check if two teams are balanced based on average MMR and MMR spread.
+
+        Args:
+            team1 (List[Player]): First team of players.
+            team2 (List[Player]): Second team of players.
+            max_mmr_diff (float): Maximum allowed MMR difference between teams.
+
+        Returns:
+            bool: True if the teams are balanced, False otherwise.
+        """
         team1_stats = self._calculate_team_stats(team1)
         team2_stats = self._calculate_team_stats(team2)
         mmr_difference = abs(team1_stats['avg_mmr'] - team2_stats['avg_mmr'])
@@ -33,7 +58,12 @@ class CktreeMatchmaker:
                 team2_stats['mmr_spread'] < 400)
 
     def find_match(self) -> Optional[Match]:
-        """Find a balanced team using efficient KD-tree searches."""
+        """
+        Find a balanced match using KD-tree searches across all roles.
+
+        Returns:
+            Optional[Match]: A match object if a balanced match is found, None otherwise.
+        """
         # Need at least 2 players in each role
         if any(len(self.role_queues[role].players) < 2 for role in
                ["Jungler", "Support", "Mid", "Top", "AD Carry"]):
@@ -51,15 +81,21 @@ class CktreeMatchmaker:
         for starter in shortest_queue.players:
             match = self._build_teams_from_starter(starter, sorted_roles)
             if match:
-                # Remove matched players from queues
-                # for player in match.team1 + match.team2:
-                #     self.role_queues[player.role].remove_player(player)
                 return match
 
         return None
 
     def _build_teams_from_starter(self, starter: Player, role_order: List[str]) -> Optional[Match]:
-        """Try to build a balanced team starting with given player."""
+        """
+        Attempt to build two balanced teams starting with a given player.
+
+        Args:
+            starter (Player): The player to start team formation.
+            role_order (List[str]): Order of roles to fill for the teams.
+
+        Returns:
+            Optional[Match]: A Match object if successful, None otherwise.
+        """
         team1 = [starter]
         team2 = []
         used_roles = {starter.role}

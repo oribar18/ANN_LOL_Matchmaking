@@ -1,14 +1,8 @@
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-# matplotlib.use('TkAgg')
-# columns = ['var_mmr', 'var_win_rate', 'var_games_played', 'var_kda', 'var_creeps', 'var_gold', 'normed_var',
-#            'maximal_mmr_diff', 'maximal_kda_diff', 'maximal_win_rate_diff', 'maximal_games_played_diff',
-#            'maximal_creeps_diff', 'maximal_gold_diff', 'max_mmr_diff', 'max_kda_diff', 'max_win_rate_diff',
-#            'max_games_played_diff', 'max_creeps_diff', 'max_gold_diff', 'mean_mmr_diff', 'mean_kda_diff',
-#            'mean_win_rate_diff', 'mean_games_played_diff', 'mean_creeps_diff', 'mean_gold_diff']
+
 
 COLUMNS = ['var_mmr', 'var_win_rate', 'var_kda', 'var_creeps', 'normed_var', 'maximal_mmr_diff', 'maximal_kda_diff',
            'maximal_win_rate_diff', 'maximal_creeps_diff',
@@ -84,6 +78,15 @@ def backward_select_features_by_aic(X_df, Y_df):
 
 
 def plot_residuals(X_df, Y_df, chosen_features, model):
+    """
+    Plot residuals of predictions from a regression model.
+
+    Parameters:
+    - X_df: pd.DataFrame, explanatory features.
+    - Y_df: pd.DataFrame, explained variable values.
+    - chosen_features: List of selected features used in the model.
+    - model: Trained regression model.
+    """
     # Predictions
     X_selected = X_df[chosen_features]
     predictions = model.predict(X_selected)
@@ -100,6 +103,15 @@ def plot_residuals(X_df, Y_df, chosen_features, model):
 
 
 def plot_actual_vs_predicted(X_df, Y_df, chosen_features, model):
+    """
+    Plot actual vs. predicted values from a regression model.
+
+    Parameters:
+    - X_df: pd.DataFrame, explanatory features.
+    - Y_df: pd.DataFrame, explained variable values.
+    - chosen_features: List of selected features used in the model.
+    - model: Trained regression model.
+    """
     # Predictions
     X_selected = X_df[chosen_features]
     predictions = model.predict(X_selected)
@@ -115,6 +127,13 @@ def plot_actual_vs_predicted(X_df, Y_df, chosen_features, model):
 
 
 def plot_feature_importance(chosen_features, model):
+    """
+    Plot feature importance based on regression model coefficients.
+
+    Parameters:
+    - chosen_features: List of feature names used in the model.
+    - model: Trained regression model.
+    """
     coefficients = model.coef_
 
     plt.figure(figsize=(8, 6))

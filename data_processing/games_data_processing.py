@@ -5,6 +5,19 @@ import pandas as pd
 from matchmaking.model import COLUMNS
 
 def process_games_data(df):
+    """
+    Processes raw game data by applying transformations and filtering based on game duration.
+
+    Args:
+        df (pd.DataFrame): Raw game data.
+
+    Returns:
+        pd.DataFrame: Processed game data with additional features.
+
+    Raises:
+        ValueError: If the input DataFrame is empty or None.
+        Exception: If any other error occurs during processing.
+    """
     if df is None or df.empty:
         raise ValueError("DataFrame is empty or None")
 
@@ -108,6 +121,16 @@ def calculate_game_score(df):
 
 
 def calculate_lineup_features_for_real_games(scored_df, games_players):
+    """
+    Calculates lineup features for real games using player and team data.
+
+    Args:
+        scored_df (pd.DataFrame): DataFrame containing game scores and statistics.
+        games_players (pd.DataFrame): DataFrame containing player statistics.
+
+    Returns:
+        pd.DataFrame: DataFrame with calculated lineup features.
+    """
     X_df = pd.DataFrame(columns=COLUMNS)
     for i in range(len(scored_df)):
         row = scored_df.iloc[i]
@@ -118,6 +141,16 @@ def calculate_lineup_features_for_real_games(scored_df, games_players):
 
 
 def calculate_lineup_features(game_matrix, game_matrix_dicts):
+    """
+    Calculate lineup features based on variance, max differences, and mean differences.
+
+    Args:
+        game_matrix (np.ndarray): Matrix representing game statistics.
+        game_matrix_dicts (list): List of dictionaries containing player statistics.
+
+    Returns:
+        list: List of calculated feature values.
+    """
     variance_vec, variance_norm = calculate_lineup_variance(game_matrix)
 
     var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold = variance_vec
@@ -144,11 +177,6 @@ def calculate_lineup_features(game_matrix, game_matrix_dicts):
     mean_creeps_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_creeps_per_min')
     mean_gold_diff = calculate_mean_diff(game_matrix_dicts, feature='avg_gold_per_min')
 
-    # features_row = [var_mmr, var_win_rate, var_games_played, var_kda, var_creeps, var_gold, normed_var,
-    #                maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff, maximal_games_played_diff,
-    #                maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
-    #                max_games_played_diff, max_creeps_diff, max_gold_diff, mean_mmr_diff, mean_kda_diff,
-    #                mean_win_rate_diff, mean_games_played_diff, mean_creeps_diff, mean_gold_diff]
     features_row = [var_mmr, var_win_rate, var_kda, var_creeps, normed_var,
                    maximal_mmr_diff, maximal_kda_diff, maximal_win_rate_diff,
                    maximal_creeps_diff, maximal_gold_diff, max_mmr_diff, max_kda_diff, max_win_rate_diff,
@@ -159,10 +187,29 @@ def calculate_lineup_features(game_matrix, game_matrix_dicts):
     return features_row
 
 
-
-
-
 def process_cs_gold_columns(df):
+    """
+    Processes the creep score (CS) and gold data for each player in a match.
+
+    This function extracts CS and gold values from a raw data column and
+    creates separate columns for each player in the match.
+
+    Returns:
+        pd.DataFrame: A DataFrame with additional columns for each player's
+                      extracted CS and gold values, named 'creeps', 'creeps 2', ...,
+                      'creeps 10' and 'gold', 'gold 2', ..., 'gold 10'.
+
+    Example:
+        Input:
+            | cs      | cs 2       |
+            |---------|------------|
+            | "202 CS - 8.7k gold" | "150 CS - 7.1k gold" |
+
+        Output:
+            | creeps  | gold   | creeps 2 | gold 2  |
+            |---------|--------|----------|---------|
+            | 202     | 8700.0 | 150      | 7100.0  |
+    """
     # Process each pair of columns for 10 players
     for i in range(1, 11):
         # Define column suffix (empty for first player, ' 2' for second, etc.)
